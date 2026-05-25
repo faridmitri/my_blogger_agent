@@ -1,0 +1,28 @@
+# ─────────────────────────────────────────────────────────────
+# Google ADK + A2A + MCP stack
+# ─────────────────────────────────────────────────────────────
+google-adk[vertexai]==1.4.2        # ADK with Vertex AI backend
+a2a-sdk==0.2.5                      # Official A2A Python SDK
+mcp[cli]>=1.9.0                     # MCP protocol + FastMCP
+fastmcp>=2.0.0                      # FastMCP server framework
+
+# ─────────────────────────────────────────────────────────────
+# Google Cloud
+# ─────────────────────────────────────────────────────────────
+google-cloud-aiplatform>=1.91.0     # Vertex AI (Gemini + Imagen)
+google-auth>=2.29.0
+google-auth-httplib2
+google-api-python-client>=2.127.0   # Blogger API v3
+
+# ─────────────────────────────────────────────────────────────
+# Tools & utilities
+# ─────────────────────────────────────────────────────────────
+google-search-results>=2.4.2        # SERP API client
+python-dotenv>=1.0.1
+httpx>=0.27.0
+pydantic>=2.7.0
+uvicorn[standard]>=0.30.0           # A2A server runtime
+starlette>=0.37.0
+pillow>=10.3.0                      # Image handling
+requests>=2.31.0
+APScheduler>=3.10.4                 # Autonomous scheduling

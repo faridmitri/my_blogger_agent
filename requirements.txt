@@ -21,3 +21,5 @@ httpx==0.28.1
 pydantic==2.13.4
 pillow==12.2.0
 requests==2.34.2
+
+feedparser==6.0.12

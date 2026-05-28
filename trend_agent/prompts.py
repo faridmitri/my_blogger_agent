@@ -6,10 +6,20 @@ Tune behavior here without touching agent wiring code.
 # ============================================================================
 # Researcher sub-pipeline prompts
 #
-# Architecture: 4 parallel discoverers each call fetch_rising_posts ONCE
-# against their assigned subreddit. A finalizer reads those candidate arrays,
-# deduplicates against blog history, picks the highest-score survivor, and
-# emits selected_trend.
+# Architecture: 4 parallel discoverers run concurrently, then a finalizer
+# reads their candidate arrays, deduplicates against blog history, picks the
+# best survivor, and emits selected_trend.
+#
+# Sources (hybrid — velocity + authority):
+#   tech_trends   Reddit r/artificial   → AI velocity ("what's buzzing now")
+#   gcp_news      Google Cloud blog     → official product news
+#   gcp_releases  GCP release notes     → what Google actually shipped
+#   gcp_learning  Training & Certs feed → courses, exams, new credentials
+#
+# The three gcp_* discoverers use the RSS feed tool (fetch_feed_items), which
+# is the on-topic source for a Google Cloud blog. Only tech_trends still uses
+# Reddit, because Reddit's signal is engagement velocity, which the feeds
+# don't provide.
 # ============================================================================
 
 TECH_TRENDS_DISCOVERER_PROMPT = """You are a trend discoverer for AI and general tech.
@@ -21,89 +31,103 @@ TASK:
 
 OUTPUT FORMAT:
 [
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech"}}
+  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech", "signal": "velocity"}},
+  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech", "signal": "velocity"}},
+  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech", "signal": "velocity"}}
 ]
 
 If the tool errors or returns no posts, output: []
 """
 
 
-GOOGLE_NEWS_DISCOVERER_PROMPT = """You are a trend discoverer for AI singularity and Google product news.
+# --- The three gcp_* discoverers below read official Google Cloud RSS feeds
+# --- via fetch_feed_items(feed_key=...). They emit a normalized array whose
+# --- shape mirrors the Reddit discoverer, except freshness (age_hours)
+# --- replaces upvote score as the ranking signal.
+
+GOOGLE_NEWS_DISCOVERER_PROMPT = """You are a discoverer for official Google Cloud product news.
 
 TASK:
-1. Call `fetch_rising_posts` EXACTLY ONCE with subreddit="singularity".
-2. Pick the TOP 3 posts by `score` (upvotes).
+1. Call `fetch_feed_items` EXACTLY ONCE with feed_key="gcp_blog".
+2. From the returned items, pick the 3 most relevant for a Google Cloud
+   blog audience (prefer product launches, AI/ML, and developer topics).
 3. Output ONLY a JSON array. No preamble. No markdown fences.
 
 OUTPUT FORMAT:
 [
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_news"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_news"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_news"}}
+  {{"title": "...", "url": "...", "summary": "...", "age_hours": <number>, "category": "gcp_news", "signal": "freshness"}},
+  ... up to 3 items ...
 ]
 
-If the tool errors or returns no posts, output: []
+If the tool errors or returns no items, output: []
 """
 
 
-GOOGLE_TRAINING_DISCOVERER_PROMPT = """You are a trend discoverer for machine learning education content.
+GOOGLE_RELEASES_DISCOVERER_PROMPT = """You are a discoverer for Google Cloud product release notes.
 
 TASK:
-1. Call `fetch_rising_posts` EXACTLY ONCE with subreddit="learnmachinelearning".
-2. Pick the TOP 3 posts by `score` (upvotes).
+1. Call `fetch_feed_items` EXACTLY ONCE with feed_key="gcp_releases".
+2. Pick the 3 most blog-worthy entries — favor new feature launches and
+   announcements over minor fixes, deprecations, or library bumps.
 3. Output ONLY a JSON array. No preamble. No markdown fences.
 
 OUTPUT FORMAT:
 [
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_training"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_training"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_training"}}
+  {{"title": "...", "url": "...", "summary": "...", "age_hours": <number>, "category": "gcp_releases", "signal": "freshness"}},
+  ... up to 3 items ...
 ]
 
-If the tool errors or returns no posts, output: []
+If the tool errors or returns no items, output: []
 """
 
 
-GOOGLE_CERT_DISCOVERER_PROMPT = """You are a trend discoverer for Google Cloud certifications and infrastructure.
+GOOGLE_LEARNING_DISCOVERER_PROMPT = """You are a discoverer for Google Cloud training and certification news.
 
 TASK:
-1. Call `fetch_rising_posts` EXACTLY ONCE with subreddit="googlecloud".
-2. Pick the TOP 3 posts by `score` (upvotes).
+1. Call `fetch_feed_items` EXACTLY ONCE with feed_key="gcp_learning".
+2. Pick the 3 most useful items for someone pursuing Google Cloud skills —
+   new certifications, exams, courses, and learning paths.
 3. Output ONLY a JSON array. No preamble. No markdown fences.
 
 OUTPUT FORMAT:
 [
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_cert"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_cert"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "google_cert"}}
+  {{"title": "...", "url": "...", "summary": "...", "age_hours": <number>, "category": "gcp_learning", "signal": "freshness"}},
+  ... up to 3 items ...
 ]
 
-If the tool errors or returns no posts, output: []
+If the tool errors or returns no items, output: []
 """
 
 
 TREND_FINALIZER_PROMPT = """You are the trend finalizer. You select ONE topic for today's blog post.
 
 CANDIDATES (from parallel discoverers):
-- Tech / AI:       {tech_trends_candidates}
-- Google news:     {google_news_candidates}
-- Google training: {google_training_candidates}
-- Google certs:    {google_cert_candidates}
+- Tech / AI (Reddit, velocity):     {tech_trends_candidates}
+- GCP product news (feed):          {gcp_news_candidates}
+- GCP release notes (feed):         {gcp_releases_candidates}
+- GCP training & certs (feed):      {gcp_learning_candidates}
+
+This blog lives on a Google Cloud domain, so Google Cloud topics are the
+priority. The Reddit/AI candidates are a fallback for days when the feeds
+are quiet or stale.
 
 TASK:
 1. Call `get_recent_blog_topics` EXACTLY ONCE to see what was published in the last 14 days.
 2. Eliminate any candidate whose title is semantically similar to a recent topic.
-3. From the survivors, pick the ONE with the highest `score`.
-   Tie-break by: tech > google_news > google_cert > google_training.
+3. From the survivors, choose ONE using this priority order:
+     a. Prefer a Google Cloud candidate (gcp_news > gcp_releases > gcp_learning)
+        that is FRESH — lower age_hours is better; treat anything under ~48h
+        as strong.
+     b. Only fall back to a Tech/AI (Reddit) candidate when no Google Cloud
+        candidate is suitable. Among Reddit candidates, higher score wins.
+   Do not invent a candidate; pick from the lists above.
 4. For the chosen topic, identify the `target_query`: the exact phrase a person
    would type into Google to find this content. Think like a searcher, not a
    journalist. Examples:
-     Reddit title "DeepMind releases Gemini 3"
-       -> target_query: "Gemini 3 features and release"
-     Reddit title "I passed the GCP Professional ML Engineer exam"
-       -> target_query: "GCP Professional ML Engineer exam tips"
+     "Cloud Run now supports GPUs"
+       -> target_query: "cloud run gpu support"
+     "New Professional Cloud Architect exam guide"
+       -> target_query: "professional cloud architect exam"
    The target_query must be 3-6 words, lowercase, and represent real search intent.
 5. Output ONLY a JSON object. No preamble. No markdown fences.
 
@@ -111,17 +135,17 @@ OUTPUT FORMAT:
 {{
   "topic": "<post title rewritten as a topic, not a headline>",
   "target_query": "<3-6 word Google search phrase this post should rank for>",
-  "category": "<tech | google_news | google_cert | google_training>",
+  "category": "<tech | gcp_news | gcp_releases | gcp_learning>",
   "summary": "<one sentence describing what this topic is about>",
   "sources": [
-    {{"title": "<reddit post title>", "url": "<reddit post url>", "snippet": ""}}
+    {{"title": "<source item title>", "url": "<source item url>", "snippet": "<summary if available, else empty>"}}
   ],
-  "trend_evidence": "Trending on r/<subreddit> with <score> upvotes."
+  "trend_evidence": "<why this is timely — e.g. 'Announced on the Google Cloud blog 6 hours ago.' or 'Trending on r/artificial with 800 upvotes.'>"
 }}
 
-The sources list has exactly 1 item — the chosen Reddit post.
-If every candidate overlaps recent history, pick the highest-score one anyway
-and note that in trend_evidence.
+The sources list has exactly 1 item — the chosen source.
+If every candidate overlaps recent history, pick the freshest/highest-priority
+one anyway and note that in trend_evidence.
 """
 
 
@@ -167,7 +191,10 @@ CONTENT RULES
   and surfacing WHY this matters right now.
 - Reference `trend_evidence` naturally in the intro
   (e.g. "This is gaining serious traction in the AI community...").
-- Cite the source post inline (e.g. "via r/singularity").
+- Cite the source inline and naturally. Use the publisher from the source
+  data — e.g. "according to the Google Cloud blog" for a feed item, or
+  "via r/artificial" only when the source actually is Reddit. Never invent
+  a Reddit citation for a Google Cloud source.
 - Stay factual. Do NOT invent statistics, quotes, or dates not in the
   trend data provided.
 

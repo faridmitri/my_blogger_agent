@@ -23,9 +23,9 @@ async def run_pipeline():
         user_id="cloud_scheduler",
         state={
             "tech_trends_candidates": [],
-            "google_news_candidates": [],
-            "google_training_candidates": [],
-            "google_cert_candidates": [],
+            "gcp_news_candidates": [],
+            "gcp_releases_candidates": [],
+            "gcp_learning_candidates": [],
         }
     )
 
@@ -69,13 +69,19 @@ async def run_pipeline():
     )
     published_url = current_session.state.get("published_url")
 
-    if published_url:
+    # The publisher writes its text output here. On success that's the live
+    # URL; on failure it's an "ERROR: ..." string (see prompts.py). Only ping
+    # the Indexing API with a real http(s) URL — otherwise we'd send the error
+    # string as a URL and get a 400 back (handoff gotcha #22).
+    if published_url and str(published_url).startswith(("http://", "https://")):
         print(f"\n↳ Requesting Google indexing for: {published_url}")
         result = request_google_indexing(published_url)
         if result.get("success"):
             print(f"✓ Indexing ping sent — {result.get('notify_time')}")
         else:
             print(f"⚠ Indexing ping failed: {result.get('error')}")
+    elif published_url:
+        print(f"⚠ Publish did not return a URL ({published_url!r}) — skipping indexing ping")
     else:
         print("⚠ No published_url in session state — skipping indexing ping")
 

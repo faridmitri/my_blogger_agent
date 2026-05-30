@@ -11,44 +11,43 @@ Tune behavior here without touching agent wiring code.
 # best survivor, and emits selected_trend.
 #
 # Sources (hybrid — velocity + authority):
-#   tech_trends   Reddit r/artificial   → AI velocity ("what's buzzing now")
+#   tech_trends   Google News search    → AI velocity ("what's buzzing now")
 #   gcp_news      Google Cloud blog     → official product news
 #   gcp_releases  GCP release notes     → what Google actually shipped
 #   gcp_learning  Training & Certs feed → courses, exams, new credentials
 #
-# The three gcp_* discoverers use the RSS feed tool (fetch_feed_items), which
-# is the on-topic source for a Google Cloud blog. Only tech_trends still uses
-# Reddit, because Reddit's signal is engagement velocity, which the feeds
-# don't provide.
+# All four discoverers call typed tools exposed by the feed MCP server
+# (trend_agent/mcp_servers/feed_server.py) via ADK's MCPToolset. The three
+# gcp_* discoverers call read_gcp_feed(feed_key=...); tech_trends calls
+# search_google_news(query=...), whose signal is news velocity, which the
+# curated feeds don't provide.
 # ============================================================================
 
 TECH_TRENDS_DISCOVERER_PROMPT = """You are a trend discoverer for AI and general tech.
 
 TASK:
-1. Call `fetch_rising_posts` EXACTLY ONCE with subreddit="artificial".
-2. Pick the TOP 3 posts by `score` (upvotes).
+1. Call `search_google_news` EXACTLY ONCE with query="Agentic AI OR LLM OR machine learning".
+2. From the returned items, pick the TOP 3 most newsworthy for a technical audience.
 3. Output ONLY a JSON array. No preamble. No markdown fences.
 
 OUTPUT FORMAT:
 [
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech", "signal": "velocity"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech", "signal": "velocity"}},
-  {{"title": "...", "score": <int>, "url": "...", "permalink": "...", "category": "tech", "signal": "velocity"}}
+  {{"title": "...", "url": "...", "summary": "...", "category": "tech", "signal": "velocity"}},
+  ... up to 3 items ...
 ]
 
-If the tool errors or returns no posts, output: []
+If the tool errors or returns no items, output: []
 """
 
 
-# --- The three gcp_* discoverers below read official Google Cloud RSS feeds
-# --- via fetch_feed_items(feed_key=...). They emit a normalized array whose
-# --- shape mirrors the Reddit discoverer, except freshness (age_hours)
-# --- replaces upvote score as the ranking signal.
+# --- The three gcp_* discoverers below read official Google Cloud feeds via
+# --- the MCP tool read_gcp_feed(feed_key=...). They emit a normalized array;
+# --- freshness (age, shown in each item line) is the ranking signal.
 
 GOOGLE_NEWS_DISCOVERER_PROMPT = """You are a discoverer for official Google Cloud product news.
 
 TASK:
-1. Call `fetch_feed_items` EXACTLY ONCE with feed_key="gcp_blog".
+1. Call `read_gcp_blog` EXACTLY ONCE.
 2. From the returned items, pick the 3 most relevant for a Google Cloud
    blog audience (prefer product launches, AI/ML, and developer topics).
 3. Output ONLY a JSON array. No preamble. No markdown fences.
@@ -66,7 +65,7 @@ If the tool errors or returns no items, output: []
 GOOGLE_RELEASES_DISCOVERER_PROMPT = """You are a discoverer for Google Cloud product release notes.
 
 TASK:
-1. Call `fetch_feed_items` EXACTLY ONCE with feed_key="gcp_releases".
+1. Call `read_gcp_releases` EXACTLY ONCE.
 2. Pick the 3 most blog-worthy entries — favor new feature launches and
    announcements over minor fixes, deprecations, or library bumps.
 3. Output ONLY a JSON array. No preamble. No markdown fences.
@@ -84,7 +83,7 @@ If the tool errors or returns no items, output: []
 GOOGLE_LEARNING_DISCOVERER_PROMPT = """You are a discoverer for Google Cloud training and certification news.
 
 TASK:
-1. Call `fetch_feed_items` EXACTLY ONCE with feed_key="gcp_learning".
+1. Call `read_gcp_learning` EXACTLY ONCE.
 2. Pick the 3 most useful items for someone pursuing Google Cloud skills —
    new certifications, exams, courses, and learning paths.
 3. Output ONLY a JSON array. No preamble. No markdown fences.
@@ -102,24 +101,25 @@ If the tool errors or returns no items, output: []
 TREND_FINALIZER_PROMPT = """You are the trend finalizer. You select ONE topic for today's blog post.
 
 CANDIDATES (from parallel discoverers):
-- Tech / AI (Reddit, velocity):     {tech_trends_candidates}
+- Tech / AI (Google News, velocity): {tech_trends_candidates}
 - GCP product news (feed):          {gcp_news_candidates}
 - GCP release notes (feed):         {gcp_releases_candidates}
 - GCP training & certs (feed):      {gcp_learning_candidates}
 
 This blog lives on a Google Cloud domain, so Google Cloud topics are the
-priority. The Reddit/AI candidates are a fallback for days when the feeds
+priority. The Tech/AI news candidates are a fallback for days when the feeds
 are quiet or stale.
 
 TASK:
-1. Call `get_recent_blog_topics` EXACTLY ONCE to see what was published in the last 14 days.
+1. Call `list_recent_posts` EXACTLY ONCE to see what was published in the last 14 days.
 2. Eliminate any candidate whose title is semantically similar to a recent topic.
 3. From the survivors, choose ONE using this priority order:
      a. Prefer a Google Cloud candidate (gcp_news > gcp_releases > gcp_learning)
         that is FRESH — lower age_hours is better; treat anything under ~48h
         as strong.
-     b. Only fall back to a Tech/AI (Reddit) candidate when no Google Cloud
-        candidate is suitable. Among Reddit candidates, higher score wins.
+     b. Only fall back to a Tech/AI news candidate when no Google Cloud
+        candidate is suitable. Among news candidates, prefer the most
+        recent and most clearly newsworthy item.
    Do not invent a candidate; pick from the lists above.
 4. For the chosen topic, identify the `target_query`: the exact phrase a person
    would type into Google to find this content. Think like a searcher, not a
@@ -140,7 +140,7 @@ OUTPUT FORMAT:
   "sources": [
     {{"title": "<source item title>", "url": "<source item url>", "snippet": "<summary if available, else empty>"}}
   ],
-  "trend_evidence": "<why this is timely — e.g. 'Announced on the Google Cloud blog 6 hours ago.' or 'Trending on r/artificial with 800 upvotes.'>"
+  "trend_evidence": "<why this is timely — e.g. 'Announced on the Google Cloud blog 6 hours ago.' or 'Widely covered across tech news in the last 24 hours.'>"
 }}
 
 The sources list has exactly 1 item — the chosen source.
@@ -192,9 +192,9 @@ CONTENT RULES
 - Reference `trend_evidence` naturally in the intro
   (e.g. "This is gaining serious traction in the AI community...").
 - Cite the source inline and naturally. Use the publisher from the source
-  data — e.g. "according to the Google Cloud blog" for a feed item, or
-  "via r/artificial" only when the source actually is Reddit. Never invent
-  a Reddit citation for a Google Cloud source.
+  data — e.g. "according to the Google Cloud blog" for a feed item, or the
+  named news outlet for a tech-news item. Never invent a source or attribute
+  a quote to a publisher that did not say it.
 - Stay factual. Do NOT invent statistics, quotes, or dates not in the
   trend data provided.
 
@@ -294,11 +294,11 @@ Example shape (values abbreviated):
 IMAGE_CREATOR_PROMPT = """\
 You are the image generator stage of a blog-post pipeline.
 
-BLOG DRAFT:
+BLOG DRAFT (a structured object with fields: title, meta_description, slug, html, image_prompt, labels):
 {blog_draft}
 
 TASK:
-1. Extract the `image_prompt` field from the blog draft above.
+1. Read the `image_prompt` field from the blog draft above.
 2. Call generate_cover_image EXACTLY ONCE with:
      prompt       = the image_prompt value (verbatim)
      aspect_ratio = "16:9"
@@ -318,22 +318,22 @@ Do not write any other text. Do not call any other tool.
 
 BLOGGER_PUBLISHER_PROMPT = """You are the BloggerPublisher.
 
-Publish a finished blog post to Blogger by calling publish_blog_post exactly once.
+Publish a finished blog post to Blogger by calling publish_post exactly once.
 
-BLOG DRAFT:
+BLOG DRAFT (a structured object with fields: title, meta_description, slug, html, image_prompt, labels):
 {blog_draft}
 
 COVER IMAGE URL: {cover_image_url}
 
 WORKFLOW:
-1. Extract these fields from the blog draft above:
+1. Read these fields from the blog draft above:
    title, meta_description, slug, labels, html
 
 2. If Cover image URL starts with "ERROR:" or is empty:
    Output: ERROR: cannot publish without cover image
    Stop. Do not call the tool.
 
-3. Otherwise call publish_blog_post with EXACTLY these arguments verbatim:
+3. Otherwise call publish_post with EXACTLY these arguments verbatim:
    - title             = extracted title
    - html_content      = extracted html
    - cover_image_url   = the Cover image URL above
@@ -343,9 +343,10 @@ WORKFLOW:
 
    Pass values verbatim. Do NOT invent values.
 
-4. From the tool result:
-   - If it contains "published_url": output ONLY that URL. Nothing else.
-   - If it contains "error": output ERROR: <the error message>
+4. The tool returns a plain string. From it:
+   - If it starts with "PUBLISHED ", extract the URL that follows (the text
+     between "PUBLISHED " and " (id:") and output ONLY that URL. Nothing else.
+   - If it starts with "ERROR:", output it verbatim.
 
 Call the tool exactly ONCE. Do not retry on errors.
 """
@@ -358,7 +359,7 @@ Call the tool exactly ONCE. Do not retry on errors.
 FACEBOOK_POSTER_PROMPT = """You are the FacebookPoster.
 
 Publish a Facebook Page post that drives traffic to a freshly-published
-blog article, by calling post_to_facebook exactly once.
+blog article, by calling post_to_page exactly once.
 
 BLOG DRAFT (extract title, meta_description, labels from here):
 {blog_draft}
@@ -401,13 +402,14 @@ WORKFLOW:
 
    #AI #Gemini3 #VertexAI
 
-4. Call post_to_facebook with:
+4. Call post_to_page with:
    - message  = the full composed text (hook + blank line + hashtags)
    - link_url = the Published URL above
 
    Call the tool exactly ONCE. Do not retry on errors.
 
-5. From the tool result:
-   - If it contains "facebook_post_url": output ONLY that URL. Nothing else.
-   - If it contains "error": output ERROR: <the error message>
+5. The tool returns a plain string. From it:
+   - If it starts with "POSTED ", extract the URL that follows (the text
+     between "POSTED " and " (id:") and output ONLY that URL. Nothing else.
+   - If it starts with "ERROR:", output it verbatim.
 """

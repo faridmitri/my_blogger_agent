@@ -22,4 +22,5 @@ pydantic==2.13.4
 pillow==12.2.0
 requests==2.34.2
 
+mcp>=1.25,<2
 feedparser==6.0.12

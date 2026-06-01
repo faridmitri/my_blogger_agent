@@ -1,8 +1,7 @@
-"""Orchestrator — InstaVibe pattern.
+"""Orchestrator
 
 An LlmAgent with a single custom tool, `send_message`, that routes a task to
-one of the remote specialist agents over A2A. This mirrors the InstaVibe
-codelab orchestrator (agents/orchestrate/agent.py):
+one of the remote specialist agents over A2A:
 
   - On construction, fetch each specialist's AgentCard and build a
     RemoteAgentConnections object per agent ("meeting the team").

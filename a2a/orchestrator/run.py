@@ -1,4 +1,4 @@
-"""Headless entrypoint for the InstaVibe-pattern orchestrator.
+"""Headless entrypoint for orchestrator.
 
 The orchestrator is a single LlmAgent whose `send_message` tool makes A2A
 calls to the three specialists. We run it with one Runner; the LLM drives all

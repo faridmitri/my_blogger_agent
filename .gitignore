@@ -1,7 +1,15 @@
-.env
-.venv/
+# ─── Secrets / credentials (both architectures) ───
+**/.env
+**/get_refresh_token.py
+*.json.key
+service-account*.json
+
+# ─── Python ───
 __pycache__/
 *.pyc
-oauth_client.json
-get_refresh_token.py
-*.log
+.pytest_cache/
+.venv/
+venv/
+
+# ─── A2A local dev logs ───
+a2a/.logs/

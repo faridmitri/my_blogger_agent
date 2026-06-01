@@ -1,0 +1,56 @@
+"""Publisher specialist — A2A server entrypoint.
+
+Wraps the publisher `root_agent` with `to_a2a()` and an explicit AgentCard.
+Its single advertised skill is publishing a finished BlogDraft across Blogger
+and Facebook (and pinging the Indexing API).
+
+Run locally:
+    uvicorn agents.publisher_agent.agent:a2a_app --host 0.0.0.0 --port 8003
+
+Agent card:
+    http://localhost:8003/.well-known/agent-card.json
+"""
+
+import os
+
+from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
+
+from .publisher import root_agent
+
+_PORT = int(os.environ.get("PORT", "8003"))
+_PUBLIC_URL = os.environ.get("PUBLISHER_PUBLIC_URL", f"http://localhost:{_PORT}")
+
+publisher_skill = AgentSkill(
+    id="publish_blog_post",
+    name="Publish Blog Post",
+    description=(
+        "Publishes a finished BlogDraft. Generates a 16:9 cover image with "
+        "Imagen 4, publishes the HTML post to Blogger, cross-posts a hook to "
+        "the Facebook Page, and requests Google indexing. Returns the live "
+        "Blogger URL and the Facebook post URL. Content is screened by a "
+        "code-enforced policy gate before any live publish."
+    ),
+    tags=["publishing", "blogger", "facebook", "imagen", "indexing"],
+    examples=[
+        "Publish this BlogDraft to Blogger and Facebook.",
+        "Generate a cover image and publish this post.",
+    ],
+)
+
+agent_card = AgentCard(
+    name="publisher_agent",
+    description=(
+        "Publisher specialist for the Cloud Edify blog pipeline. Generates the "
+        "cover image, publishes to Blogger, cross-posts to Facebook, and pings "
+        "the Indexing API."
+    ),
+    url=_PUBLIC_URL,
+    version="1.0.0",
+    default_input_modes=["text/plain"],
+    default_output_modes=["text/plain"],
+    capabilities=AgentCapabilities(streaming=True),
+    skills=[publisher_skill],
+)
+
+a2a_app = to_a2a(root_agent, port=_PORT, agent_card=agent_card)

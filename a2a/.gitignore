@@ -1,0 +1,15 @@
+# Secrets / credentials
+.env
+get_refresh_token.py
+*.json.key
+service-account*.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Dev logs from run_services.sh
+.logs/

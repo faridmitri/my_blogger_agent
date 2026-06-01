@@ -13,3 +13,6 @@ venv/
 
 # ─── A2A local dev logs ───
 a2a/.logs/
+
+**/oauth_client.json
+oauth_client.json

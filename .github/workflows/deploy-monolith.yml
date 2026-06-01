@@ -1,0 +1,77 @@
+name: Deploy Monolith to Cloud Run
+
+# The monolith is the DEPLOYED production system. A2A is local/reference only
+# and has no workflow. This fires only on changes under monolith/ so editing
+# a2a/ never triggers a deploy.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'monolith/**'
+      - '.github/workflows/deploy-monolith.yml'
+
+env:
+  PROJECT_ID: gen-lang-client-0230396996
+  REGION: us-central1
+  REPOSITORY: trend-agent
+  IMAGE: trend-agent
+  JOB_NAME: trend-agent-job
+  SERVICE_ACCOUNT: trend-agent-runner@gen-lang-client-0230396996.iam.gserviceaccount.com
+  WORKLOAD_IDENTITY_PROVIDER: projects/487905766954/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  SECRETS: "GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT:latest,GOOGLE_CLOUD_LOCATION=GOOGLE_CLOUD_LOCATION:latest,GOOGLE_GENAI_USE_VERTEXAI=GOOGLE_GENAI_USE_VERTEXAI:latest,VERTEX_IMAGEN_LOCATION=VERTEX_IMAGEN_LOCATION:latest,IMAGE_BUCKET=IMAGE_BUCKET:latest,BLOGGER_CLIENT_ID=BLOGGER_CLIENT_ID:latest,BLOGGER_CLIENT_SECRET=BLOGGER_CLIENT_SECRET:latest,BLOGGER_REFRESH_TOKEN=BLOGGER_REFRESH_TOKEN:latest,BLOGGER_BLOG_ID=BLOGGER_BLOG_ID:latest,FACEBOOK_PAGE_ID=FACEBOOK_PAGE_ID:latest,FACEBOOK_PAGE_ACCESS_TOKEN=FACEBOOK_PAGE_ACCESS_TOKEN:latest,FACEBOOK_API_VERSION=FACEBOOK_API_VERSION:latest"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    # All run steps execute inside monolith/, so the Docker build context
+    # (the trailing ".") resolves to monolith/ and its Dockerfile.
+    defaults:
+      run:
+        working-directory: monolith
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2.1.8
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URI=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run Job
+        run: |
+          if gcloud run jobs describe ${{ env.JOB_NAME }} --region=${{ env.REGION }} &>/dev/null; then
+            gcloud run jobs update ${{ env.JOB_NAME }} \
+              --image=${{ env.IMAGE_URI }} \
+              --region=${{ env.REGION }} \
+              --set-secrets="${{ env.SECRETS }}"
+          else
+            gcloud run jobs create ${{ env.JOB_NAME }} \
+              --image=${{ env.IMAGE_URI }} \
+              --region=${{ env.REGION }} \
+              --service-account=${{ env.SERVICE_ACCOUNT }} \
+              --memory=1Gi \
+              --cpu=1 \
+              --task-timeout=600 \
+              --set-secrets="${{ env.SECRETS }}"
+          fi
+
+      - name: Confirm deployment
+        run: |
+          echo "✅ Deployed image: ${{ env.IMAGE_URI }}"
+          echo "✅ Cloud Run Job: ${{ env.JOB_NAME }} in ${{ env.REGION }}"
+          echo "Trigger a run with: gcloud run jobs execute ${{ env.JOB_NAME }} --region=${{ env.REGION }}"

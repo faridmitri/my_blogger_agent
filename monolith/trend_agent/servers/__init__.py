@@ -27,10 +27,15 @@ _FACEBOOK_SERVER = os.environ.get(
 
 
 def _stdio_toolset(server_path: str, tool_filter: list[str]) -> McpToolset:
+    # 1. Explicitly capture all of Cloud Run's mounted secrets
+    server_env = dict(os.environ)
+    
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
-                command=sys.executable, args=[server_path]
+                command=sys.executable, 
+                args=[server_path],
+                env=server_env  # 2. Inject them into the MCP subprocess!
             ),
             timeout=60,
         ),

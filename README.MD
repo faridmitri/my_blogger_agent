@@ -34,7 +34,7 @@ Every day, automatically:
 
 ### `monolith/` — one process, one deployable
 
-![A2A Architecture](img/monolith_architecture.svg)
+![A2A Architecture](img/monolith_architecture.png)
 
 ```
 Cloud Scheduler ──► Cloud Run Job
@@ -59,7 +59,7 @@ Gemini 2.5 Flash, Imagen 4, Blogger v3, Facebook Graph API, GCS, Indexing API.
 
 ### `a2a/` — four services, A2A protocol
 
-![A2A Architecture](img/a2a_architecture.svg)
+![A2A Architecture](img/a2a_architecture.png)
 
 ```
 Cloud Scheduler ──► Cloud Run Job (orchestrator)

@@ -34,7 +34,7 @@ Every day, automatically:
 
 ### `monolith/` — one process, one deployable
 
-![A2A Architecture](img/monolith_architecture.html)
+![A2A Architecture](img/monolith_architecture.svg)
 
 ```
 Cloud Scheduler ──► Cloud Run Job
@@ -59,7 +59,7 @@ Gemini 2.5 Flash, Imagen 4, Blogger v3, Facebook Graph API, GCS, Indexing API.
 
 ### `a2a/` — four services, A2A protocol
 
-![A2A Architecture](img/a2a_architecture.html)
+![A2A Architecture](img/a2a_architecture.svg)
 
 ```
 Cloud Scheduler ──► Cloud Run Job (orchestrator)
@@ -278,3 +278,12 @@ contentCreator/
 
 - **`PLAYBOOK.md`** — all commands: run locally, one-time GCP setup, deploy each
   architecture, schedule the job, troubleshoot.
+
+
+## Agents in action
+
+### Monolith
+![A2A Architecture](img/logs_monolith.png)
+
+### A2A
+![A2A Architecture](img/logs_a2a.png)

@@ -25,10 +25,10 @@ SERVICE_ACCOUNT = YOUR SA
 # PART A — Repo layout
 
 ```
-my_blogger_agent/
+DigitalCreatorAgent/
 ├── README.md
 ├── .github/workflows/
-│   └── deploy-monolith.yml      ← the ONLY workflow; deploys the monolith
+│   └── deploy-monolith.yml      ← the ONLY workflow; deployspowershell the monolith
 ├── monolith/                    ← DEPLOYED (Cloud Run Job)
 │   ├── trend_agent/
 │   ├── run_agent.py
@@ -51,7 +51,7 @@ The `.venv` lives at the **repo root** and is shared by both folders.
 # PART B — Run the monolith locally (the deployed pipeline)
 
 ```powershell
-cd D:\projects\my_blogger_agent\monolith
+cd D:\projects\DigitalCreatorAgent\monolith
 ..\.venv\Scripts\activate          # venv is at the repo root
 pip install -r requirements.txt
 copy .env.example .env             # then fill in the 12 values
@@ -74,7 +74,7 @@ python -m pytest tests/ -q
 The A2A version is three services + an orchestrator. All on localhost, no auth.
 
 ```powershell
-cd D:\projects\my_blogger_agent\a2a
+cd D:\projects\DigitalCreatorAgent\a2a
 ..\.venv\Scripts\activate
 pip install -r requirements.txt
 copy .env.example .env             # same 12 values; leave USE_CLOUD_RUN_AUTH=false
@@ -143,7 +143,7 @@ gcloud services enable \
 gcloud artifacts repositories describe trend-agent --location=us-central1 \
   || gcloud artifacts repositories create trend-agent \
        --repository-format=docker --location=us-central1 \
-       --description="my_blogger_agent images"
+       --description="DigitalCreatorAgent images"
 ```
 
 ### D3. The 12 secrets in Secret Manager

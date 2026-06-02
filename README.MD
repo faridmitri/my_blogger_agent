@@ -3,11 +3,19 @@
 > An autonomous AI content engine that researches trending technology, writes SEO-optimized articles, generates cover art, and publishes to Blogger and Facebook — every day, with zero human input.
 
 <p align="center">
-  <img src="img/monolith_architecture.png" alt="Architecture overview" width="100%">
+  <img alt="Google ADK" src="https://img.shields.io/badge/Google_ADK-1.34-34A853?style=for-the-badge&logo=google&logoColor=white">
+  <img alt="Gemini 2.5" src="https://img.shields.io/badge/Gemini-2.5_Flash-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white">
+  <img alt="Imagen 4" src="https://img.shields.io/badge/Imagen-4-EA4335?style=for-the-badge&logo=google&logoColor=white">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-3_servers-FF6F00?style=for-the-badge">
+  <img alt="A2A Protocol" src="https://img.shields.io/badge/A2A-Protocol-1A73E8?style=for-the-badge">
 </p>
 
 <p align="center">
-  <em>Built on Google's Agent Development Kit (ADK) · Gemini 2.5 · Imagen 4 · Model Context Protocol (MCP) · Agent-to-Agent (A2A) protocol · Cloud Run</em>
+  <img alt="Cloud Run" src="https://img.shields.io/badge/Cloud_Run-Service_%2B_Job-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white">
+  <img alt="CI/CD" src="https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white">
+  <img alt="Architectures" src="https://img.shields.io/badge/Architectures-Monolith_%2B_A2A-9334E6?style=for-the-badge">
+  <img alt="License" src="https://img.shields.io/badge/License-MIT-555555?style=for-the-badge">
 </p>
 
 ---
@@ -101,8 +109,8 @@ Both architectures reuse the **exact same** integration and tool code:
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/faridmitri/my_blogger_agent.git
-cd my_blogger_agent
+git clone https://github.com/faridmitri/DigitalCreatorAgent.git
+cd DigitalCreatorAgent
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 ```
@@ -182,7 +190,7 @@ The three specialist services deploy `--no-allow-unauthenticated`. The orchestra
 ## 📁 Repo layout
 
 ```
-my_blogger_agent/
+DigitalCreatorAgent/
 ├── README.MD                       ← you are here
 ├── PLAYBOOK.MD                     ← step-by-step: local run, GCP setup, deploy
 ├── img/                            ← architecture + log screenshots

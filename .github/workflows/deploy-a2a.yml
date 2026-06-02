@@ -24,6 +24,7 @@ name: Deploy A2A to Cloud Run
 #   - 12 secrets in Secret Manager (same names used by the monolith)
 #   - Service account with required IAM roles
 #   - Workload Identity Federation pool + provider bound to your GitHub repo
+#   - GitHub Repository Variables: PROJECT_ID and PROJECT_NUM
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -45,14 +46,14 @@ on:
   #     - 'a2a/**'
   #     - '.github/workflows/deploy-a2a.yml'
 
-# ─── Update these to match your GCP project ───────────────────────────────
+# ─── Environment Variables ────────────────────────────────────────────────
 env:
-  PROJECT_ID:   gen-lang-client-0230396996
-  PROJECT_NUM:  487905766954
-  REGION:       us-central1
-  REPOSITORY:   digital-worker          # Artifact Registry repo for A2A images
-  SERVICE_ACCOUNT: trend-agent-runner@gen-lang-client-0230396996.iam.gserviceaccount.com
-  WORKLOAD_IDENTITY_PROVIDER: projects/487905766954/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  PROJECT_ID: ${{ vars.PROJECT_ID }}
+  PROJECT_NUM: ${{ vars.PROJECT_NUM }}
+  REGION: us-central1
+  REPOSITORY: digital-worker          # Artifact Registry repo for A2A images
+  SERVICE_ACCOUNT: trend-agent-runner@${{ vars.PROJECT_ID }}.iam.gserviceaccount.com
+  WORKLOAD_IDENTITY_PROVIDER: projects/${{ vars.PROJECT_NUM }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
   SECRETS: "GOOGLE_CLOUD_PROJECT=GOOGLE_CLOUD_PROJECT:latest,GOOGLE_CLOUD_LOCATION=GOOGLE_CLOUD_LOCATION:latest,GOOGLE_GENAI_USE_VERTEXAI=GOOGLE_GENAI_USE_VERTEXAI:latest,VERTEX_IMAGEN_LOCATION=VERTEX_IMAGEN_LOCATION:latest,IMAGE_BUCKET=IMAGE_BUCKET:latest,BLOGGER_CLIENT_ID=BLOGGER_CLIENT_ID:latest,BLOGGER_CLIENT_SECRET=BLOGGER_CLIENT_SECRET:latest,BLOGGER_REFRESH_TOKEN=BLOGGER_REFRESH_TOKEN:latest,BLOGGER_BLOG_ID=BLOGGER_BLOG_ID:latest,FACEBOOK_PAGE_ID=FACEBOOK_PAGE_ID:latest,FACEBOOK_PAGE_ACCESS_TOKEN=FACEBOOK_PAGE_ACCESS_TOKEN:latest,FACEBOOK_API_VERSION=FACEBOOK_API_VERSION:latest"
 
 jobs:
